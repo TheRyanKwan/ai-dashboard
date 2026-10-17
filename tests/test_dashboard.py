@@ -43,13 +43,20 @@ def test_motion_preserves_metrics_and_layout(sample, state):
     first = renderer.frame(sample, 0)
     second = renderer.frame(sample, .6)
     assert first.size == (1920, 480)
-    assert first.crop((0, 0, 1310, 480)).tobytes() == second.crop((0, 0, 1310, 480)).tobytes()
+    assert first.crop((376, 0, 1310, 480)).tobytes() == second.crop(
+        (376, 0, 1310, 480)).tobytes()
+    assert first.crop((0, 288, 376, 480)).tobytes() == second.crop(
+        (0, 288, 376, 480)).tobytes()
+    assert first.crop((29, 71, 320, 155)).tobytes() == second.crop(
+        (29, 71, 320, 155)).tobytes()
+    assert first.crop((0, 0, 376, 288)).tobytes() != second.crop(
+        (0, 0, 376, 288)).tobytes()
     assert first.crop((1310, 320, 1920, 480)).tobytes() == second.crop(
         (1310, 320, 1920, 480)).tobytes()
     assert first.tobytes() != second.tobytes()
     seam_y = renderer.panel["Y"] + 231
-    assert first.crop((0, seam_y, 1920, seam_y + 1)).tobytes() == second.crop(
-        (0, seam_y, 1920, seam_y + 1)).tobytes()
+    assert first.crop((376, seam_y, 1920, seam_y + 1)).tobytes() == second.crop(
+        (376, seam_y, 1920, seam_y + 1)).tobytes()
     renderer = DashboardRenderer(reduced_motion=True)
     assert renderer.frame(sample, 0).tobytes() == renderer.frame(sample, 1).tobytes()
 

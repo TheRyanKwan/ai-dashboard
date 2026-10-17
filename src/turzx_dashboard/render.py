@@ -30,13 +30,19 @@ class DashboardRenderer:
         self.theme = yaml.safe_load((ASSETS / "theme/theme.yaml").read_text(encoding="utf-8"))
         self.background = Image.open(ASSETS / "theme/background.png").convert("RGB")
         self.reduced_motion = reduced_motion
+        # Erase the baked-in strokes inside the orange disc, preserving its outer edge.
+        self.balance_background = self.background.crop((0, 0, 376, 288))
+        clean = self.balance_background.resize((1128, 864), Image.Resampling.BICUBIC)
+        ImageDraw.Draw(clean).ellipse((-120, -282, 1086, 828), fill=(255, 151, 116))
+        self.balance_background = clean.resize((376, 288), Image.Resampling.LANCZOS)
         self._snapshot = None
         self.base = None
         self.icon = None
 
     def _text(self, image, value, style):
         # Match the original DisplayText anchor and fixed-box clipping behavior.
-        layer = self.background.copy()
+        layer = (Image.new("RGBA", image.size) if image.mode == "RGBA"
+                 else self.background.copy())
         draw = ImageDraw.Draw(layer)
         x, y = style["X"], style["Y"]
         width, height = style.get("WIDTH", 0), style.get("HEIGHT", 0)
@@ -58,8 +64,10 @@ class DashboardRenderer:
 
     def _prepare(self, snapshot):
         self.base = self.background.copy()
-        for style in self.theme["static_text"].values():
-            self._text(self.base, style["TEXT"], style)
+        self.balance_text = Image.new("RGBA", (376, 288))
+        for name, style in self.theme["static_text"].items():
+            target = self.balance_text if name == "BALANCE" else self.base
+            self._text(target, style["TEXT"], style)
         stats = self.theme["STATS"]["CUSTOM"]
         costs = sorted((c["cost"] for c in snapshot["calls"] or []), reverse=True)[:3]
 
@@ -76,7 +84,8 @@ class DashboardRenderer:
                 for i in range(3)),
         }
         for name, value in values.items():
-            self._text(self.base, value, stats[name]["TEXT"])
+            target = self.balance_text if name == "NewApiRmbBalance" else self.base
+            self._text(target, value, stats[name]["TEXT"])
         chart = stats["NewApiCallCosts"]["CALL_CHART"]
         self.base.paste(render_call_chart(snapshot["calls"], chart, FONTS),
                         (chart["X"], chart["Y"]))
@@ -100,11 +109,29 @@ class DashboardRenderer:
             draw.text((422, 5), label, font=font("roboto-mono/RobotoMono-Regular.ttf", 12),
                       fill=(100, 59, 37), anchor="lt")
 
+    def _balance(self, now):
+        # Supersample the thin strokes so slow rotation stays smooth at panel resolution.
+        lines = Image.new("L", (1128, 864))
+        draw = ImageDraw.Draw(lines)
+        for bounds, period, start, sweep, width in (
+            ((-36, -90, 356, 270), 16, -100, 285, 1),
+            ((-24, -78, 344, 258), -12, 12, 145, 3),
+        ):
+            angle = start + (now / period % 1) * 360
+            draw.arc(tuple(v * 3 for v in bounds), angle, angle + sweep,
+                     fill=255, width=width * 3)
+        circle = self.balance_background.copy()
+        lines = lines.resize(circle.size, Image.Resampling.LANCZOS)
+        circle.paste((29, 37, 39), (0, 0, circle.width, circle.height), lines)
+        circle.paste(self.balance_text, (0, 0), self.balance_text)
+        return circle
+
     def frame(self, snapshot, now=0):
         if snapshot != self._snapshot:
             self._prepare(snapshot)
             self._snapshot = deepcopy(snapshot)
         frame = self.base.copy()
+        frame.paste(self._balance(0 if self.reduced_motion else now), (0, 0))
         icon = self.icon
         if not self.reduced_motion:
             # Transform only the illustration; state words and token/cost figures stay fixed.
