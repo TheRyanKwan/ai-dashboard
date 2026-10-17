@@ -13,7 +13,7 @@ static_text:
   BALANCE:
     TEXT: balance
     X: 49
-    Y: 64
+    Y: 24
     FONT: roboto-mono/RobotoMono-Regular.ttf
     FONT_SIZE: 16
     FONT_COLOR: 29, 37, 39
@@ -22,9 +22,9 @@ static_text:
   TODAY:
     TEXT: today
     X: 28
-    Y: 342
+    Y: 294
     FONT: roboto-mono/RobotoMono-Regular.ttf
-    FONT_SIZE: 16
+    FONT_SIZE: 20
     FONT_COLOR: 29, 37, 39
     BACKGROUND_IMAGE: background.png
     ANCHOR: lt
@@ -35,7 +35,7 @@ STATS:
       TEXT:
         SHOW: true
         X: 29
-        Y: 111
+        Y: 71
         WIDTH: 304
         HEIGHT: 100
         FONT: roboto/Roboto-Bold.ttf
@@ -47,11 +47,11 @@ STATS:
       TEXT:
         SHOW: true
         X: 26
-        Y: 370
-        WIDTH: 192
-        HEIGHT: 48
+        Y: 326
+        WIDTH: 188
+        HEIGHT: 58
         FONT: roboto/Roboto-Bold.ttf
-        FONT_SIZE: 38
+        FONT_SIZE: 48
         FONT_COLOR: 29, 37, 39
         BACKGROUND_IMAGE: background.png
         ANCHOR: lt
@@ -59,11 +59,11 @@ STATS:
       TEXT:
         SHOW: true
         X: 28
-        Y: 426
-        WIDTH: 264
-        HEIGHT: 27
+        Y: 390
+        WIDTH: 184
+        HEIGHT: 30
         FONT: roboto-mono/RobotoMono-Regular.ttf
-        FONT_SIZE: 17
+        FONT_SIZE: 21
         FONT_COLOR: 29, 37, 39
         BACKGROUND_IMAGE: background.png
         ANCHOR: lt
@@ -71,11 +71,11 @@ STATS:
       TEXT:
         SHOW: true
         X: 241
-        Y: 354
+        Y: 310
         WIDTH: 170
-        HEIGHT: 88
+        HEIGHT: 92
         FONT: roboto-mono/RobotoMono-Regular.ttf
-        FONT_SIZE: 18
+        FONT_SIZE: 22
         FONT_COLOR: 29, 37, 39
         BACKGROUND_IMAGE: background.png
         ANCHOR: la
