@@ -369,47 +369,43 @@ def _write_codex_record(event, path):
 
 
 def codex_state(settings, now=None):
-    """Derive the icon state on refresh; completion expires without a timer thread."""
-    path = event_path(settings)
-    now = now or datetime.now(timezone.utc)
-    try:
-        duration = float(settings.get("CODEX_DONE_SECONDS", 30))
-        if not math.isfinite(duration) or duration < 0:
-            raise ValueError("Invalid done duration")
-    except (TypeError, ValueError):
-        duration = 30
-    records = list(Path(str(path) + ".sessions").glob("*.json"))
-    records.append(path)
-    done = False
-    for record in records:
-        try:
-            event = json.loads(record.read_text(encoding="utf-8"))
-            if record == path and event.get("session_id"):
-                continue  # This is a mirror of a session record, not a separate task.
-            state = event.get("state", "done" if "completed_at" in event else "idle")
-            if state == "working":
-                return "working"
-            if state == "done":
-                completed = datetime.fromisoformat(event["completed_at"])
-                age = (now - completed).total_seconds()
-                done = done or 0 <= age < duration
-        except (OSError, ValueError, KeyError, TypeError, AttributeError):
-            continue
-    return "done" if done else "idle"
+    """Use the same lifecycle sources and expiry as the dashboard snapshot."""
+    return codex_snapshot(settings, now=now)["state"]
 
 
-def codex_snapshot(settings):
+def codex_snapshot(settings, now=None):
     """Select one conversation so the icon and token counters describe the same work."""
+    from turzx_dashboard._vendor.turing.codex_activity import activity_cache
     from turzx_dashboard._vendor.turing.codex_usage import usage_cache
 
+    now = now or datetime.now(timezone.utc)
     path = event_path(settings)
     selected = settings.get("CODEX_SESSION_ID")
-    records = []
+    events = activity_cache.read(settings)
     for record in list(Path(str(path) + ".sessions").glob("*.json")) + [path]:
         try:
             event = json.loads(record.read_text(encoding="utf-8"))
             if not isinstance(event, dict) or record == path and event.get("session_id"):
                 continue
+            events.append(event)
+        except (OSError, ValueError):
+            continue
+    # Reconcile each conversation before prioritizing working sessions. Otherwise
+    # an older start could hide a newer completion from the other event source.
+    latest = {}
+    for index, event in enumerate(events):
+        try:
+            updated = datetime.fromisoformat(event.get("updated_at") or event.get("completed_at"))
+            if updated.tzinfo is None:
+                continue
+            key = event.get("session_id") or ("anonymous", index)
+            if key not in latest or updated >= latest[key][0]:
+                latest[key] = (updated, event)
+        except (TypeError, ValueError):
+            continue
+    records = []
+    for updated, event in latest.values():
+        try:
             if selected and event.get("session_id") != selected:
                 continue
             state = event.get("state", "done" if "completed_at" in event else "idle")
@@ -423,12 +419,9 @@ def codex_snapshot(settings):
                         duration = 30
                 except (TypeError, ValueError):
                     duration = 30
-                age = (datetime.now(timezone.utc) - datetime.fromisoformat(event["completed_at"])).total_seconds()
+                age = (now - datetime.fromisoformat(event["completed_at"])).total_seconds()
                 if not 0 <= age < duration:
                     state = "idle"
-            updated = datetime.fromisoformat(event.get("updated_at") or event.get("completed_at"))
-            if updated.tzinfo is None:
-                continue
             records.append(({"working": 2, "done": 1, "idle": 0}[state], updated, event, state))
         except (OSError, ValueError, KeyError, TypeError):
             continue

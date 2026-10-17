@@ -198,6 +198,12 @@ counts, and explicitly configured model prices. Forked sessions load inherited u
 from their parent transcript up to the recorded fork boundary; keep those transcripts
 available in `CODEX_SESSIONS_DIR` (by default, `~/.codex/sessions`).
 
+The dashboard also detects Working, Done, and Idle directly from local transcript
+lifecycle events. This supports Codex clients that do not deliver start hooks.
+It follows the 128 most recently modified transcripts (or the pinned
+`CODEX_SESSION_ID`), reading new records on each poll. The newest lifecycle event
+for each session wins when both transcripts and hooks are available.
+
 Costs require `CODEX_MODEL_RATES` and `CODEX_COST_CURRENCY` in this project's
 configuration. Rates are prices **per million tokens**, in the chosen currency,
 for `INPUT`, `CACHE_READ`, `CACHE_WRITE`, and `OUTPUT`. Use `"*"` for default

@@ -64,6 +64,8 @@ class TranscriptUsage:
         self.modified = None
         self.checkpoint = b""
         self.sessions = set()
+        self.project = ""
+        self.activity = None
         self.total = None
         self.reliable = True
         self.turn = None
@@ -159,6 +161,9 @@ class TranscriptUsage:
         if record.get("type") == "session_meta":
             if isinstance(payload.get("id"), str):
                 self.sessions.add(payload["id"])
+            cwd = payload.get("cwd")
+            if isinstance(cwd, str):
+                self.project = cwd.replace("\\", "/").rstrip("/").split("/")[-1]
             return
         if record.get("type") == "turn_context":
             self.model = payload.get("model") if isinstance(payload.get("model"), str) else None
@@ -174,15 +179,18 @@ class TranscriptUsage:
             self.baseline = self.total
             self.invalid_turn = False
             self.completed = False
+            self._activity(record, "working")
             self.cost_baseline = dict(self.cost_counts) if self.components is not None else None
             self.invalid_cost_turn = False
         elif kind == "turn_aborted":
             if payload.get("turn_id") in (None, self.turn):
                 self.turn = None
                 self.completed = False
+                self._activity(record, "idle")
         elif kind == "task_complete":
             if self.turn and payload.get("turn_id") == self.turn:
                 self.completed = True
+                self._activity(record, "done")
                 self._complete()
         elif kind == "token_count":
             info = payload.get("info")
@@ -207,6 +215,19 @@ class TranscriptUsage:
             self.total = total
             if self.completed:
                 self._complete()  # Completion notification may precede the final usage flush.
+
+    def _activity(self, record, state):
+        from datetime import datetime
+
+        try:
+            updated = datetime.fromisoformat(record["timestamp"])
+            if updated.tzinfo is None:
+                return
+        except (KeyError, TypeError, ValueError):
+            return
+        self.activity = dict(state=state, updated_at=updated.isoformat(), turn_id=self.turn)
+        if state == "done":
+            self.activity["completed_at"] = updated.isoformat()
 
     def _complete(self):
         self.last_task = (self.total - self.baseline
