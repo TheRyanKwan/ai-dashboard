@@ -83,7 +83,9 @@ The simulator updates `output/frame.png` atomically four times a second. It runs
 Ctrl+C unless `--duration` is supplied. Demo playback cycles Idle → Working → Done
 every six seconds; `--state` pins a state for testing.
 
-The lines around the balance circle orbit slowly in opposite directions.
+Soft peach, lavender, and blue meteors shoot diagonally across the open background,
+with fading trails behind the artwork. The lines around the balance circle orbit
+slowly in opposite directions.
 `--reduced-motion` keeps the artwork static. The changing state remains visible in
 words and expressions. Account figures and Codex token/cost figures stay still during
 animation.

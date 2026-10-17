@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from ._vendor.turing.codex_icon import render_codex_icon
 from ._vendor.turing.dashboard_chart import render_call_chart
@@ -38,6 +38,14 @@ class DashboardRenderer:
         self._snapshot = None
         self.base = None
         self.icon = None
+
+    @staticmethod
+    def _paper_mask(image, shade):
+        # Only untouched paper can receive trails; illustration edges stay intact.
+        difference = ImageChops.difference(image, Image.new("RGB", image.size, shade))
+        channels = difference.split()
+        difference = ImageChops.lighter(ImageChops.lighter(channels[0], channels[1]), channels[2])
+        return difference.point([255] + [0] * 255)
 
     def _text(self, image, value, style):
         # Match the original DisplayText anchor and fixed-box clipping behavior.
@@ -109,6 +117,77 @@ class DashboardRenderer:
             draw.text((422, 5), label, font=font("roboto-mono/RobotoMono-Regular.ttf", 12),
                       fill=(100, 59, 37), anchor="lt")
 
+        paper = color(self.panel["BACKGROUND_COLOR"])
+        self.meteor_mask = self._paper_mask(self.base, paper)
+        mask = ImageDraw.Draw(self.meteor_mask)
+        # Reserve complete text boxes, including the spaces between glyphs.
+        for style in [*self.theme["static_text"].values(),
+                      *(stats[name]["TEXT"] for name in values)]:
+            x, y = style["X"], style["Y"]
+            if style.get("WIDTH") and style.get("HEIGHT"):
+                box = (x, y, x + style["WIDTH"], y + style["HEIGHT"])
+            else:
+                box = ImageDraw.Draw(self.base).textbbox(
+                    (x, y), style["TEXT"], font=font(style["FONT"], style["FONT_SIZE"]),
+                    anchor=style.get("ANCHOR", "la"))
+            mask.rectangle(box, fill=0)
+        mask.rectangle((0, 0, 375, 287), fill=0)
+        mask.rectangle((chart["X"], chart["Y"], chart["X"] + chart["WIDTH"] - 1,
+                        chart["Y"] + chart["HEIGHT"] - 1), fill=0)
+        mask.rectangle((self.panel["X"], self.panel["Y"],
+                        self.panel["X"] + self.icon.width - 1,
+                        self.panel["Y"] + self.icon.height - 1), fill=0)
+        # The status line may contain variable-length error messages.
+        mask.rectangle((422, 0, 1309, 20), fill=0)
+
+    def _meteors(self, frame, icon, now):
+        trails = Image.new("RGBA", frame.size)
+        draw = ImageDraw.Draw(trails)
+        palette = ((211, 123, 92), (150, 124, 191), (93, 160, 173))
+        # x/y start, travel vector, repeat interval, phase offset. Independent
+        # cycles keep the sky varied without mutable particles or random flicker.
+        paths = (
+            (350, -25, 590, 150, 3.4, .2),
+            (1315, -30, 90, 260, 3.7, .25),
+            (1950, -20, -100, 250, 4.3, .7),
+            (400, 448, 760, 36, 3.1, .6),
+            (-100, 422, 460, 100, 3.9, .45),
+            (1250, 490, -720, -44, 4.65, 2.4),
+            (325, 100, 270, 160, 4.15, 2.2),
+            (1320, 10, 520, 260, 5.35, 3.05),
+        )
+        for index, (x, y, dx, dy, period, phase) in enumerate(paths):
+            age = (now + phase) % period
+            duration = 2.8
+            if age >= duration:
+                continue
+            progress = age / duration
+            fade = min(progress / .15, 1, (1 - progress) / .25)
+            head_x, head_y = x + dx * progress, y + dy * progress
+            distance = math.hypot(dx, dy)
+            ux, uy = dx / distance, dy / distance
+            length = 210
+            shade = palette[index % len(palette)]
+            # Draw from faint tail to bright head, with a soft wider outer trail.
+            for step in range(32):
+                along = step / 32
+                tail = length * (1 - along)
+                end = length * (1 - (step + 1) / 32)
+                segment = (head_x - ux * tail, head_y - uy * tail,
+                           head_x - ux * end, head_y - uy * end)
+                alpha = round(180 * along ** 1.6 * fade)
+                draw.line(segment, fill=(*shade, alpha // 5), width=11)
+                draw.line(segment, fill=(*shade, alpha), width=4)
+            draw.ellipse((head_x - 3.5, head_y - 3.5, head_x + 3.5, head_y + 3.5),
+                         fill=(*shade, round(220 * fade)))
+        mask = self.meteor_mask.copy()
+        # Recompute only the moving illustration's paper, so trails pass behind it.
+        paper = self._paper_mask(icon.crop((0, 0, icon.width, 232)),
+                                 color(self.panel["BACKGROUND_COLOR"]))
+        mask.paste(paper, (self.panel["X"], self.panel["Y"]))
+        trails.putalpha(ImageChops.multiply(trails.getchannel("A"), mask))
+        frame.paste(trails, (0, 0), trails)
+
     def _balance(self, now):
         # Supersample the thin strokes so slow rotation stays smooth at panel resolution.
         lines = Image.new("L", (1128, 864))
@@ -160,6 +239,8 @@ class DashboardRenderer:
             # the full source avoids an empty strip along the moving crop's lower edge.
             icon.paste(moved.crop((0, 0, icon.width, 232)), (0, 0), self.motion_mask)
         frame.paste(icon, (self.panel["X"], self.panel["Y"]))
+        if not self.reduced_motion:
+            self._meteors(frame, icon, now)
         return frame
 
 

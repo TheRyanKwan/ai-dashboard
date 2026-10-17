@@ -43,10 +43,9 @@ def test_motion_preserves_metrics_and_layout(sample, state):
     first = renderer.frame(sample, 0)
     second = renderer.frame(sample, .6)
     assert first.size == (1920, 480)
-    assert first.crop((376, 0, 1310, 480)).tobytes() == second.crop(
-        (376, 0, 1310, 480)).tobytes()
-    assert first.crop((0, 288, 376, 480)).tobytes() == second.crop(
-        (0, 288, 376, 480)).tobytes()
+    for box in ((422, 27, 1286, 449), (26, 326, 214, 384),
+                (28, 390, 212, 420), (241, 310, 411, 402), (422, 0, 1310, 20)):
+        assert first.crop(box).tobytes() == second.crop(box).tobytes()
     assert first.crop((29, 71, 320, 155)).tobytes() == second.crop(
         (29, 71, 320, 155)).tobytes()
     assert first.crop((0, 0, 376, 288)).tobytes() != second.crop(
@@ -59,6 +58,40 @@ def test_motion_preserves_metrics_and_layout(sample, state):
         (376, seam_y, 1920, seam_y + 1)).tobytes()
     renderer = DashboardRenderer(reduced_motion=True)
     assert renderer.frame(sample, 0).tobytes() == renderer.frame(sample, 1).tobytes()
+
+
+@pytest.mark.parametrize("now", [0, .6, 1.8, 3.2, 7.9, 18, 3600])
+def test_meteors_move_only_on_open_paper(sample, monkeypatch, now):
+    renderer = DashboardRenderer()
+    animated = renderer.frame(sample, now)
+    monkeypatch.setattr(renderer, "_meteors", lambda *_: None)
+    without_meteors = renderer.frame(sample, now)
+    difference = ImageChops.difference(animated, without_meteors)
+    if now == 0:
+        assert difference.getbbox() is not None
+    # A shooting star must never paint on text, chart ribbons, or the mascot.
+    original_bytes, changed_bytes = without_meteors.tobytes(), difference.tobytes()
+    for index in range(0, len(changed_bytes), 3):
+        if changed_bytes[index:index + 3] != b"\0\0\0":
+            assert original_bytes[index:index + 3] == bytes((245, 239, 224))
+
+
+def test_meteors_are_time_based_and_reduced_motion_disables_them(sample, monkeypatch):
+    renderer = DashboardRenderer()
+    first = renderer.frame(sample, .6).tobytes()
+    renderer.frame(sample, 12)
+    assert renderer.frame(sample, .6).tobytes() == first
+    assert DashboardRenderer().frame(sample, .6).tobytes() == first
+    # Check motion in exposed paper independently of the existing mascot animation.
+    assert renderer.frame(sample, 0).crop((422, 450, 1286, 480)).tobytes() != (
+        renderer.frame(sample, .6).crop((422, 450, 1286, 480)).tobytes())
+    still = DashboardRenderer(reduced_motion=True)
+
+    def unexpected(*_):
+        pytest.fail("Reduced motion must skip meteor rendering")
+
+    monkeypatch.setattr(still, "_meteors", unexpected)
+    assert still.frame(sample, 0).tobytes() == still.frame(sample, 18).tobytes()
 
 
 def test_visible_strip_mapping_and_rotation():
