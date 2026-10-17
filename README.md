@@ -193,9 +193,18 @@ Use this project's `notify` command for all Codex events. No scripts, environmen
 configuration, or assets from another project are required. Events default to
 `~/.cache/turzx-dashboard/codex-event.json`, with separate records for each session.
 Local Codex transcripts supply session selection, cached-input subtraction, task
-counts, and explicitly configured model prices. Set `CODEX_MODEL_RATES` and
-`CODEX_COST_CURRENCY` in this project's configuration if needed. Unknown usage or
-prices display an em dash.
+counts, and explicitly configured model prices. Forked sessions load inherited usage
+from their parent transcript up to the recorded fork boundary; keep those transcripts
+available in `CODEX_SESSIONS_DIR` (by default, `~/.codex/sessions`).
+
+Costs require `CODEX_MODEL_RATES` and `CODEX_COST_CURRENCY` in this project's
+configuration. Rates are prices **per million tokens**, in the chosen currency,
+for `INPUT`, `CACHE_READ`, `CACHE_WRITE`, and `OUTPUT`. Use `"*"` for default
+rates or an exact model name for an override. `INPUT` applies to input excluding
+cache reads and writes; output already includes reasoning tokens. See the commented
+example in `dashboard.example.yaml` and replace its sample values with your provider's
+billing rates. Restart the dashboard after changing configuration. Unknown usage,
+missing parent history, or missing prices display an em dash.
 
 To check the event bridge without changing live state:
 

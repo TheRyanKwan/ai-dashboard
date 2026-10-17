@@ -30,5 +30,13 @@ dashboard:
   CODEX_EVENT_FILE: "~/.cache/turzx-dashboard/codex-event.json"
   CODEX_SESSION_ID: ""
   CODEX_SESSIONS_DIR: ""
-  # Optional: retain your existing CODEX_COST_CURRENCY and CODEX_MODEL_RATES here.
-  # No model prices are assumed. Missing prices display an em dash.
+  # Costs require your provider's prices per million tokens, in one currency.
+  # Example values only: uncomment and replace all four with your billing rates.
+  # CODEX_COST_CURRENCY: CNY
+  # CODEX_MODEL_RATES:
+  #   "*":  # default rates; use a model name for a model-specific override
+  #     INPUT: 0.8
+  #     CACHE_READ: 0.04
+  #     CACHE_WRITE: 1
+  #     OUTPUT: 4
+  # No model prices are assumed. Missing prices or history display an em dash.

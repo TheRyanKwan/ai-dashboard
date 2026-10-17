@@ -14,6 +14,20 @@ def _count(value):
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
+def _sessions_directory(settings):
+    return Path((settings or {}).get("CODEX_SESSIONS_DIR") or
+                Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions").expanduser()
+
+
+def _session_path(directory, session):
+    if not isinstance(session, str) or not session or any(
+            character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+            for character in session):
+        return None
+    candidates = directory.glob("**/rollout-*-" + session + ".jsonl")
+    return max(candidates, key=lambda path: path.stat().st_mtime_ns, default=None)
+
+
 def _cost(counts, settings):
     if counts is None:
         return None
@@ -65,7 +79,7 @@ class TranscriptUsage:
         self.invalid_cost_turn = False
         self.last_task_counts = None
 
-    def read(self, path, session, settings=None):
+    def read(self, path, session, settings=None, *, _limit=None, _ancestors=()):
         unknown = {"session_tokens": None, "last_task_tokens": None}
         if settings is not None:
             unknown.update(session_cost=None, last_task_cost=None)
@@ -73,6 +87,8 @@ class TranscriptUsage:
         try:
             with Path(path).open("rb") as stream:
                 stat = os.fstat(stream.fileno())
+                if _limit is not None and stat.st_size < _limit:
+                    return unknown
                 identity = (stat.st_dev, stat.st_ino)
                 stream.seek(max(0, self.offset - len(self.checkpoint)))
                 unchanged = stream.read(len(self.checkpoint)) == self.checkpoint
@@ -83,7 +99,7 @@ class TranscriptUsage:
                 self.identity = identity
                 stream.seek(self.offset)
                 while True:
-                    line = stream.readline()
+                    line = stream.readline() if _limit is None else stream.readline(_limit - stream.tell())
                     if not line or not line.endswith(b"\n"):
                         break  # A writer may still be appending this record; retry next refresh.
                     self.offset = stream.tell()
@@ -92,6 +108,9 @@ class TranscriptUsage:
                     except (ValueError, UnicodeError):
                         continue
                     if isinstance(record, dict):
+                        if record.get("type") == "session_meta" and self.total is None:
+                            self._inherit_history(record.get("payload"), settings,
+                                                  _ancestors + (session,))
                         self._record(record)
                 stream.seek(max(0, self.offset - 128))
                 self.checkpoint = stream.read(min(128, self.offset))
@@ -99,7 +118,8 @@ class TranscriptUsage:
         except OSError:
             return unknown
         # A supplied path or filename alone is insufficient proof of session ownership.
-        if not session or session not in self.sessions:
+        if (not session or session not in self.sessions or
+                _limit is not None and self.offset != _limit):
             return unknown
         result = {"session_tokens": self.total if self.reliable else None,
                   "last_task_tokens": self.last_task}
@@ -109,6 +129,28 @@ class TranscriptUsage:
                           if self.cost_reliable and self.components is not None else None,
                           last_task_cost=_cost(self.last_task_counts, settings))
         return result
+
+    def _inherit_history(self, payload, settings, ancestors):
+        history = payload.get("history_base") if isinstance(payload, dict) else None
+        if not isinstance(history, dict) or len(ancestors) >= 16:
+            return
+        session = history.get("thread_id")
+        limit = _count(history.get("end_byte_offset"))
+        if not session or session in ancestors or not limit:
+            return
+        try:
+            path = _session_path(_sessions_directory(settings), session)
+        except OSError:
+            return
+        if path is None:
+            return
+        parent = TranscriptUsage()
+        parent.read(path, session, settings, _limit=limit, _ancestors=ancestors)
+        if session not in parent.sessions or parent.offset != limit:
+            return
+        # Keep the parent's usage and model attribution, but start a fresh task lifecycle.
+        for name in ("total", "reliable", "model", "components", "cost_counts", "cost_reliable"):
+            setattr(self, name, getattr(parent, name))
 
     def _record(self, record):
         payload = record.get("payload")
@@ -227,8 +269,7 @@ class CodexUsageCache:
                    "cost_currency": settings.get("CODEX_COST_CURRENCY", "USD")}
         if not isinstance(session, str) or not session:
             return unknown
-        directory = settings.get("CODEX_SESSIONS_DIR") or str(
-            Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions")
+        directory = _sessions_directory(settings)
         key = (session, str(transcript or ""), str(directory))
         entry = self.readers.pop(key, None)
         if entry is None:
@@ -241,12 +282,8 @@ class CodexUsageCache:
         elif time.monotonic() >= entry["next_search"] and (
                 entry["path"] is None or not entry["path"].is_file()):
             entry["next_search"] = time.monotonic() + 5
-            # Treat the session ID as a filename fragment, never a path or glob expression.
-            if any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for character in session):
-                return unknown
             try:
-                candidates = Path(directory).expanduser().glob("**/rollout-*-" + session + ".jsonl")
-                entry["path"] = max(candidates, key=lambda path: path.stat().st_mtime_ns, default=None)
+                entry["path"] = _session_path(directory, session)
             except OSError:
                 return unknown
         if entry["path"] is None:

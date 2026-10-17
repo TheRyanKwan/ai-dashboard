@@ -224,6 +224,76 @@ class CodexUsageTests(unittest.TestCase):
         settings["CODEX_MODEL_RATES"]["model-b"]["OUTPUT"] = 0
         self.assertAlmostEqual(self.reader.read(self.path, "one", settings)["last_task_cost"], 0.00278)
 
+    def test_fork_inherits_usage_only_up_to_recorded_history_boundary(self):
+        settings = self.cost_settings()
+        settings["CODEX_SESSIONS_DIR"] = str(self.root)
+        self.event("task_started", turn_id="parent")
+        self.model("model-a")
+        self.priced_usage(1000, 600, 100)
+        self.event("task_complete", turn_id="parent")
+        boundary = self.path.stat().st_size
+        self.event("task_started", turn_id="after-fork")
+        self.priced_usage(3000, 1800, 300)
+        self.event("task_complete", turn_id="after-fork")
+
+        fork = self.root / "rollout-date-fork.jsonl"
+        records = [
+            {"type": "session_meta", "payload": {"id": "fork", "history_base": {
+                "thread_id": "one", "end_byte_offset": boundary}}},
+            {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "child"}},
+            {"type": "turn_context", "payload": {"model": "model-b"}},
+            {"type": "event_msg", "payload": {"type": "token_count", "info": {
+                "total_token_usage": {"input_tokens": 2000, "cached_input_tokens": 1200,
+                                      "output_tokens": 200, "total_tokens": 2200},
+                "last_token_usage": {"input_tokens": 1000, "cached_input_tokens": 600,
+                                     "output_tokens": 100, "total_tokens": 1100}}}},
+            {"type": "event_msg", "payload": {"type": "task_complete", "turn_id": "child"}},
+        ]
+        fork.write_text("".join(json.dumps(record) + "\n" for record in records))
+        cache = CodexUsageCache()
+        snapshot = cache.read("fork", str(fork), settings)
+        self.assertEqual(snapshot["session_tokens"], 1000)
+        self.assertEqual(snapshot["last_task_tokens"], 500)
+        self.assertAlmostEqual(snapshot["session_cost"], 0.00576)
+        self.assertAlmostEqual(snapshot["last_task_cost"], 0.00384)
+        self.assertEqual(snapshot, cache.read("fork", str(fork), settings))
+        self.assertEqual(snapshot, CodexUsageCache().read("fork", str(fork), settings))
+
+        for history in (
+                {"thread_id": "missing", "end_byte_offset": boundary},
+                {"thread_id": "one", "end_byte_offset": boundary - 1},
+                {"thread_id": "one", "end_byte_offset": self.path.stat().st_size + 1},
+                {"thread_id": "one", "end_byte_offset": True},
+                {"thread_id": "../one", "end_byte_offset": boundary},
+                {"thread_id": "fork", "end_byte_offset": boundary}):
+            with self.subTest(history=history):
+                records[0]["payload"]["history_base"] = history
+                fork.write_text("".join(json.dumps(record) + "\n" for record in records))
+                unavailable = CodexUsageCache().read("fork", str(fork), settings)
+                self.assertIsNone(unavailable["session_cost"])
+                self.assertIsNone(unavailable["last_task_cost"])
+
+    def test_nested_fork_preserves_models_and_does_not_inherit_last_task(self):
+        settings = self.cost_settings()
+        settings["CODEX_SESSIONS_DIR"] = str(self.root)
+        self.event("task_started", turn_id="parent")
+        self.model("model-a")
+        self.priced_usage(1000, 600, 100)
+        self.event("task_complete", turn_id="parent")
+        parent_id = "one"
+        parent_path = self.path
+        for session in ("child", "grandchild"):
+            path = self.root / f"rollout-date-{session}.jsonl"
+            path.write_text(json.dumps({"type": "session_meta", "payload": {
+                "id": session, "history_base": {"thread_id": parent_id,
+                                                 "end_byte_offset": parent_path.stat().st_size}}}) + "\n")
+            snapshot = CodexUsageCache().read(session, str(path), settings)
+            self.assertAlmostEqual(snapshot["session_cost"], 0.00192)
+            self.assertEqual(snapshot["session_tokens"], 500)
+            self.assertIsNone(snapshot["last_task_tokens"])
+            self.assertIsNone(snapshot["last_task_cost"])
+            parent_id, parent_path = session, path
+
     def test_cost_unknown_rates_and_components_do_not_look_free(self):
         self.event("task_started", turn_id="first")
         self.model("model-a")
