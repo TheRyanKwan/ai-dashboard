@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "turzx-dashboard"
+version = "0.1.0"
+description = "Animated AI dashboard for the TURZX 9.2-inch screen, from the command line"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD_PARTY.md"]
+dependencies = ["Pillow>=10.1", "PyYAML>=6", "requests>=2.31", "psutil>=5.9"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.optional-dependencies]
+usb = ["pyusb>=1.2", "pycryptodome>=3.19", "libusb-package>=1.0; sys_platform == 'win32'"]
+dev = ["pytest>=8", "ruff>=0.11", "build>=1", "imageio-ffmpeg>=0.6"]
+
+[project.scripts]
+turzx-dashboard = "turzx_dashboard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+turzx_dashboard = ["assets/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["src/turzx_dashboard/_vendor", "tests/test_codex_usage.py", "tests/fake_panel.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

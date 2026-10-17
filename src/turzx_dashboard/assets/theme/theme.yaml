@@ -1,0 +1,122 @@
+# Personal cut-paper instruments. Native 1920 x 480; no section headings.
+display:
+  DISPLAY_SIZE: 9.2"
+  DISPLAY_ORIENTATION: landscape
+static_images:
+  BACKGROUND:
+    PATH: background.png
+    X: 0
+    Y: 0
+    WIDTH: 1920
+    HEIGHT: 480
+static_text:
+  BALANCE:
+    TEXT: balance
+    X: 49
+    Y: 64
+    FONT: roboto-mono/RobotoMono-Regular.ttf
+    FONT_SIZE: 16
+    FONT_COLOR: 29, 37, 39
+    BACKGROUND_IMAGE: background.png
+    ANCHOR: lt
+  TODAY:
+    TEXT: today
+    X: 28
+    Y: 342
+    FONT: roboto-mono/RobotoMono-Regular.ttf
+    FONT_SIZE: 16
+    FONT_COLOR: 29, 37, 39
+    BACKGROUND_IMAGE: background.png
+    ANCHOR: lt
+STATS:
+  CUSTOM:
+    INTERVAL: 2
+    NewApiRmbBalance:
+      TEXT:
+        SHOW: true
+        X: 29
+        Y: 111
+        WIDTH: 304
+        HEIGHT: 100
+        FONT: roboto/Roboto-Bold.ttf
+        FONT_SIZE: 86
+        FONT_COLOR: 29, 37, 39
+        BACKGROUND_IMAGE: background.png
+        ANCHOR: lt
+    NewApiTodaySpend:
+      TEXT:
+        SHOW: true
+        X: 26
+        Y: 370
+        WIDTH: 192
+        HEIGHT: 48
+        FONT: roboto/Roboto-Bold.ttf
+        FONT_SIZE: 38
+        FONT_COLOR: 29, 37, 39
+        BACKGROUND_IMAGE: background.png
+        ANCHOR: lt
+    NewApiTodayAverage:
+      TEXT:
+        SHOW: true
+        X: 28
+        Y: 426
+        WIDTH: 264
+        HEIGHT: 27
+        FONT: roboto-mono/RobotoMono-Regular.ttf
+        FONT_SIZE: 17
+        FONT_COLOR: 29, 37, 39
+        BACKGROUND_IMAGE: background.png
+        ANCHOR: lt
+    NewApiTopCallCosts:
+      TEXT:
+        SHOW: true
+        X: 241
+        Y: 354
+        WIDTH: 170
+        HEIGHT: 88
+        FONT: roboto-mono/RobotoMono-Regular.ttf
+        FONT_SIZE: 18
+        FONT_COLOR: 29, 37, 39
+        BACKGROUND_IMAGE: background.png
+        ANCHOR: la
+    NewApiCallCosts:
+      CALL_CHART:
+        SHOW: true
+        STYLE: ribbon
+        X: 422
+        Y: 27
+        WIDTH: 864
+        HEIGHT: 422
+        FONT: roboto-mono/RobotoMono-Regular.ttf
+        LABEL_FONT_SIZE: 17
+        DETAIL_FONT_SIZE: 21
+        BACKGROUND_COLOR: 29, 37, 39
+        TEXT_COLOR: 184, 191, 183
+        TRACK_COLOR: 61, 69, 68
+        COST_COLOR: 255, 151, 116
+        INPUT_COLOR: 199, 178, 239
+        TIME_COLOR: 147, 208, 219
+        CACHE_COLOR: 211, 226, 151
+        SURROUND_COLOR: 245, 239, 224
+    CodexState:
+      STATE_ICON:
+        SHOW: true
+        LAYOUT: signal
+        X: 1310
+        Y: 0
+        WIDTH: 610
+        HEIGHT: 480
+        FONT: roboto/Roboto-Black.ttf
+        LABEL_FONT: roboto-mono/RobotoMono-Regular.ttf
+        SHOW_TOKENS: true
+        SHOW_COSTS: true
+        TOKEN_COLOR: 29, 37, 39
+        BACKGROUND_COLOR: 245, 239, 224
+        IDLE_COLOR: 85, 103, 99
+        WORKING_COLOR: 166, 59, 34
+        DONE_COLOR: 29, 37, 39
+        FACE_COLOR: 199, 178, 239
+        CHEEK_COLOR: 255, 151, 116
+        DONE_FONT_SIZE: 58
+        DONE_PULSE_SECONDS: 4
+        DONE_BURST_COLOR: 255, 151, 116

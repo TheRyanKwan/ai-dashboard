@@ -1,0 +1,34 @@
+# Copy to dashboard.local.yaml (ignored by Git), or reuse the original flat local file.
+fps: 30
+reduced_motion: false
+
+display:
+  brightness: 60
+  # Required for video: the EXISTING standby clip name on your screen.
+  # Common vendor value: usr/data/standby.h264. Verify yours before setting it.
+  clip: ""
+  ffmpeg: ""  # empty searches PATH; otherwise an absolute executable path
+  y_offset: 18  # Libre Panel's native framebuffer hides the first 18 landscape rows
+  rotate: 0  # 0 or 180
+
+dashboard:
+  DEMO: false
+  NEW_API_URL: ""
+  NEW_API_AUTH_MODE: token  # token or cookie
+  NEW_API_ACCESS_TOKEN: ""
+  NEW_API_COOKIE: ""
+  NEW_API_USER_ID: ""
+  QUOTA_PER_RMB: 500000
+  DAY_UTC_OFFSET: 8
+  POLL_SECONDS: 20
+  CHART_POLL_SECONDS: 2
+  TIMEOUT_SECONDS: 5
+  LOG_TIMEOUT_SECONDS: 20
+  LOG_PAGE_LIMIT: 100
+  CODEX_DONE_SECONDS: 30
+  # Use turzx-dashboard notify for Codex hooks and completion notifications.
+  CODEX_EVENT_FILE: "~/.cache/turzx-dashboard/codex-event.json"
+  CODEX_SESSION_ID: ""
+  CODEX_SESSIONS_DIR: ""
+  # Optional: retain your existing CODEX_COST_CURRENCY and CODEX_MODEL_RATES here.
+  # No model prices are assumed. Missing prices display an em dash.

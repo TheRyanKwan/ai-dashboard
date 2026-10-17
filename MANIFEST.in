@@ -1,0 +1,5 @@
+include dashboard.example.yaml
+include check-new-api.py
+include THIRD_PARTY.md
+recursive-include tests *.py
+recursive-include .github/workflows *.yml
