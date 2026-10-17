@@ -136,16 +136,25 @@ class DashboardRenderer:
         if not self.reduced_motion:
             # Transform only the illustration; state words and token/cost figures stay fixed.
             state = snapshot["codex"].get("state", "idle")
-            period, amplitude = {"idle": (5, 1.5), "working": (2.4, 4),
-                                 "done": (1.8, 7)}.get(state, (5, 1.5))
-            wave = math.sin(math.tau * now / period)
-            scale = 1 + amplitude / 300 * wave
-            cx, cy = 344, 76
-            moved = icon.transform(icon.size, Image.Transform.AFFINE,
-                                   (1 / scale, 0, cx * (1 - 1 / scale),
-                                    0, 1 / scale, cy * (1 - 1 / scale) + amplitude * wave),
-                                   Image.Resampling.BICUBIC,
-                                   fillcolor=color(self.panel["BACKGROUND_COLOR"]))
+            if state == "done":
+                # A small satisfied tilt, eased back to rest, with a quiet pause.
+                progress = min((now % 6) / 1.6, 1)
+                lean = .08 * math.sin(math.tau * progress) * math.sin(math.pi * progress) ** 2
+                # Lean around the base of the face so its cropped top stays filled.
+                moved = icon.transform(icon.size, Image.Transform.AFFINE,
+                                       (1, lean, -220 * lean, 0, 1, 0),
+                                       Image.Resampling.BICUBIC,
+                                       fillcolor=color(self.panel["BACKGROUND_COLOR"]))
+            else:
+                period, amplitude = {"idle": (5, 1.5), "working": (2.4, 4)}.get(state, (5, 1.5))
+                wave = math.sin(math.tau * now / period)
+                scale = 1 + amplitude / 300 * wave
+                cx, cy = 344, 76
+                moved = icon.transform(icon.size, Image.Transform.AFFINE,
+                                       (1 / scale, 0, cx * (1 - 1 / scale),
+                                        0, 1 / scale, cy * (1 - 1 / scale) + amplitude * wave),
+                                       Image.Resampling.BICUBIC,
+                                       fillcolor=color(self.panel["BACKGROUND_COLOR"]))
             icon = icon.copy()
             # Fade back to the stationary artwork before its state label. Transforming
             # the full source avoids an empty strip along the moving crop's lower edge.
